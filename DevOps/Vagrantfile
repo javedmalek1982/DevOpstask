@@ -1,0 +1,64 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Configure Vagrant with version 2 syntax
+Vagrant.configure("2") do |config|
+  # Set the base box to use
+  config.vm.box = "ubuntu/focal64"
+
+  # Configure a private network with a static IP address
+  config.vm.network "private_network", ip: "192.168.33.10"
+
+  # Mount the local directory './data' to '/data' on the virtual machine
+  config.vm.synced_folder "./docker_provision", "/home/vagrant/docker_provision"
+  
+  # Set the hostname for the virtual machine
+  config.vm.hostname = "dev-server"
+
+  # Configure the virtualbox provider and set memory size
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "2048"
+    # Set the name of the virtual machine in VirtualBox
+    vb.name = "dev-server"
+  end
+
+  # Provision the virtual machine with Terraform and set password for user "vagrant"
+  config.vm.provision "shell", inline: <<-SHELL
+    # Set password for user "vagrant" to "password"
+    echo 'vagrant:password' | chpasswd
+
+    # Update package list
+    sudo apt-get update
+    sudo apt-get -y install awscli
+    sudo apt-get install -y python3-pip
+
+    # Install wget and unzip
+    sudo apt-get install -y wget unzip
+
+    # Download Terraform version 1.3.7
+    wget https://releases.hashicorp.com/terraform/1.3.7/terraform_1.3.7_linux_amd64.zip
+
+    # Unzip Terraform binary
+    unzip terraform_1.3.7_linux_amd64.zip
+
+    # Move Terraform binary to /usr/local/bin
+    sudo mv terraform /usr/local/bin/
+
+    # Clean up the Terraform ZIP file
+    rm terraform_1.3.7_linux_amd64.zip
+
+    #To get autocomplete syntax support while writing codes using Terraform
+    terraform -install-autocomplete
+
+    #Run terraform tempates to create the docker
+    cd /home/vagrant/docker_provision/task2
+    cp -pR ../main_01.tf main.tf
+    terraform init
+    terraform plan
+    terraform apply -auto-approve
+    
+    cp -pR ../main_02.tf main.tf
+    terraform apply -auto-approve
+
+  SHELL
+end
